@@ -29,7 +29,7 @@ int main()
     write(client_sockfd, &ch, 1);
     read(client_sockfd, &ch, 1);
     printf("the first time: char from server = %c\n", ch);
-    sleep(5);
+    sleep(3);
 
     //第二次读写
     write(client_sockfd, &ch, 1);

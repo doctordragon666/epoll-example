@@ -16,19 +16,14 @@ int cur_max_fd = 0;
 
 int main()
 {
-    int client_sockfd;
-    int server_len, client_len;
-
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
     server_address.sin_port = htons(9000);
+    int server_len = sizeof(server_address);
 
-    struct sockaddr_in client_address;
-    int result;
     int server_sockfd = socket(AF_INET, SOCK_STREAM, 0); //建立服务器端socket
-    
-    server_len = sizeof(server_address);
+
     bind(server_sockfd, (struct sockaddr *)&server_address, server_len);
     listen(server_sockfd, 5); //监听队列最多容纳5个
 
@@ -40,10 +35,13 @@ int main()
         cur_max_fd = server_sockfd + 1;
     }
 
+    int client_sockfd, fd;
+    int client_len;
+    struct sockaddr_in client_address;
+    int result;
     while (1)
     {
         char ch;
-        int i, fd;
         int nread;
         printf("server waiting\n");
 
@@ -55,11 +53,10 @@ int main()
             exit(1);
         }
         /*扫描所有的文件描述符*/
-        for (i = 0; i < cur_max_fd; i++)
+        for (int i = 0; i < cur_max_fd; i++)
         {
-
             /*找到相关文件描述符*/
-            if (fds[i].revents && fds[i].events == POLLIN)
+            if (fds[i].revents)
             {
                 fd = fds[i].fd;
                 /*判断是否为服务器套接字，是则表示为客户请求连接。*/
@@ -82,27 +79,31 @@ int main()
                 /*客户端socket中有数据请求时*/
                 else
                 {
-                    nread = read(fd, &ch, 1);
-                    /*客户数据请求完毕，关闭套接字，从集合中清除相应描述符 */
-                    if (nread == 0)
+                    if (fds[i].revents & POLLIN)
                     {
-                        close(fd);
-                        memset(&fds[i], 0, sizeof(struct pollfd)); //去掉关闭的fd
-                        printf("removing client on fd %d\n", fd);
+                        nread = read(fd, &ch, 1);
+                        /*客户数据请求完毕，关闭套接字，从集合中清除相应描述符 */
+                        if (nread == 0)
+                        {
+                            close(fd);
+                            memset(&fds[i], 0, sizeof(struct pollfd)); //去掉关闭的fd
+                            printf("removing client on fd %d\n", fd);
+                        }
+                        /*处理客户数据请求*/
+                        else
+                        {
+                            fds[i].events = POLLOUT; //转化为out事件
+                        }
                     }
-                    /*处理客户数据请求*/
-                    else
+                    else if (fds[i].revents & POLLOUT)
                     {
-                        fds[i].events = POLLOUT;
+                        sleep(3);
+                        printf("serving client on fd %d, read: %c\n", fd, ch);
+                        ch++;
+                        write(fd, &ch, 1);
+                        fds[i].events = POLLIN;
                     }
                 }
-            }
-            else if (fds[i].revents && fds[i].events == POLLOUT)
-            {
-                sleep(5);
-                printf("serving client on fd %d, read: %c\n", fd, ch);
-                ch++;
-                write(fd, &ch, 1);
             }
         }
     }

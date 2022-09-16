@@ -7,6 +7,18 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+/// @brief ch++返回客户端
+/// @param fd 客户端句柄
+/// @param ch 要发送的字符
+void handle(int fd, int ch)
+{
+    read(fd, &ch, 1);
+    sleep(5);
+    printf("serving client on fd %d\n", fd);
+    ch++;
+    write(fd, &ch, 1);
+}
+
 int main()
 {
     int server_sockfd, client_sockfd;
@@ -50,32 +62,24 @@ int main()
                 if (fd == server_sockfd)
                 {
                     client_len = sizeof(client_address);
-                    client_sockfd = accept(server_sockfd,(struct sockaddr *)&client_address, &client_len);
+                    client_sockfd = accept(server_sockfd, (struct sockaddr *)&client_address, &client_len);
                     FD_SET(client_sockfd, &readfds); //将客户端socket加入到集合中
                     printf("adding client on fd %d\n", client_sockfd);
+                    continue;
                 }
                 /*客户端socket中有数据请求时*/
-                else
-                {
-                    ioctl(fd, FIONREAD, &nread); //取得数据量交给nread
 
-                    /*客户数据请求完毕，关闭套接字，从集合中清除相应描述符 */
-                    if (nread == 0)
-                    {
-                        close(fd);
-                        FD_CLR(fd, &readfds); //去掉关闭的fd
-                        printf("removing client on fd %d\n", fd);
-                    }
-                    /*处理客户数据请求*/
-                    else
-                    {
-                        read(fd, &ch, 1);
-                        sleep(5);
-                        printf("serving client on fd %d\n", fd);
-                        ch++;
-                        write(fd, &ch, 1);
-                    }
+                ioctl(fd, FIONREAD, &nread); //取得数据量交给nread
+                /*客户数据请求完毕，关闭套接字，从集合中清除相应描述符 */
+                if (nread == 0)
+                {
+                    close(fd);
+                    FD_CLR(fd, &readfds); //去掉关闭的fd
+                    printf("removing client on fd %d\n", fd);
+                    continue;
                 }
+                /*处理客户数据请求*/
+                handle(fd, ch);
             }
         }
     }
